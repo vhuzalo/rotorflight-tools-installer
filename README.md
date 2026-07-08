@@ -23,7 +23,7 @@ Clone or download this repository and run:
 
 ```bash
 chmod +x bin/rotorflight-tools-installer.sh
-./bin/rotorflight-tools-installer.sh
+sudo ./bin/rotorflight-tools-installer.sh
 ```
 
 Show help:
