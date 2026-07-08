@@ -1,46 +1,46 @@
 # Rotorflight Tools Installer
 
-Script interativo para instalar ou atualizar ferramentas comuns de Rotorflight no Linux.
+Interactive Linux installer/updater for common Rotorflight tools.
 
-Ele baixa releases oficiais do GitHub, instala os aplicativos em `/opt`, cria atalhos `.desktop` e instala regras `udev` para permitir acesso USB/DFU a controladoras de voo.
+The script downloads official GitHub releases, installs applications under `/opt`, creates `.desktop` launchers, and installs `udev` rules for USB/DFU access to flight controllers.
 
-## Ferramentas Instaladas
+## Installed Tools
 
 - Rotorflight Configurator
 - Rotorflight Blackbox
 - ExpressLRS Configurator
-- Regras `udev` para firmware flashing e portas seriais USB comuns
+- `udev` rules for firmware flashing and common USB serial ports
 
-## Sistemas Suportados
+## Supported Systems
 
-Testado em Manjaro Linux.
+Tested on Manjaro Linux.
 
-O script deve funcionar em outras distribuicoes Linux com `bash`, `curl`, `jq`, `tar`, `unzip`, `find`, `awk`, `sudo` e `udev`, mas isso ainda precisa ser validado.
+The script should work on other Linux distributions with `bash`, `curl`, `jq`, `tar`, `unzip`, `find`, `awk`, `sudo`, and `udev`, but that still needs validation.
 
-## Instalacao
+## Installation
 
-Clone ou baixe este repositorio e execute:
+Clone or download this repository and run:
 
 ```bash
 chmod +x bin/rotorflight-tools-installer.sh
 ./bin/rotorflight-tools-installer.sh
 ```
 
-Para ver a ajuda:
+Show help:
 
 ```bash
 ./bin/rotorflight-tools-installer.sh --help
 ```
 
-## Dependencias
+## Dependencies
 
-No Manjaro/Arch:
+On Manjaro/Arch:
 
 ```bash
 sudo pacman -S --needed curl jq unzip tar
 ```
 
-No Ubuntu/Debian:
+On Ubuntu/Debian:
 
 ```bash
 sudo apt install curl jq unzip tar
@@ -52,53 +52,53 @@ sudo apt install curl jq unzip tar
 1) Rotorflight Configurator
 2) Rotorflight Blackbox
 3) ExpressLRS Configurator
-4) Rotorflight Configurator + Blackbox + regras udev (padrao)
-5) Instalar regras udev do Rotorflight
-6) Todos - ultima versao estavel, sem perguntar release
+4) Rotorflight Configurator + Blackbox + udev rules (default)
+5) Install Rotorflight udev rules
+6) All - latest stable version, no release prompt
 ```
 
-As opcoes `1`, `2`, `3` e `4` permitem escolher o release na lista retornada pelo GitHub.
+Options `1`, `2`, `3`, and `4` let you choose a release from the list returned by GitHub.
 
-A opcao `6` nao pergunta qual release instalar. Ela seleciona automaticamente a ultima versao `stable`, ignorando pre-releases/dev builds.
+Option `6` does not ask which release to install. It automatically selects the latest `stable` version and ignores pre-releases/dev builds.
 
-## O Que O Script Faz
+## What The Script Does
 
-- consulta os releases oficiais no GitHub;
-- baixa o pacote Linux compativel;
-- extrai o arquivo;
-- instala em `/opt`;
-- cria backup da instalacao anterior antes de substituir;
-- cria atalhos `.desktop`;
-- instala regras `udev` em `/etc/udev/rules.d/60-rotorflight.rules`;
-- recarrega as regras com `udevadm`, quando disponivel.
+- fetches official releases from GitHub;
+- downloads the compatible Linux package;
+- extracts the archive;
+- installs the application under `/opt`;
+- creates a backup of the previous installation before replacing it;
+- creates `.desktop` launchers;
+- installs `udev` rules to `/etc/udev/rules.d/60-rotorflight.rules`;
+- reloads rules with `udevadm` when available.
 
-## Regras Udev
+## Udev Rules
 
-As regras `udev` permitem que o usuario acesse controladoras em modo DFU/USB sem precisar executar o configurador como root.
+The `udev` rules allow the user to access flight controllers in DFU/USB mode without running the configurator as root.
 
-Depois de instalar as regras:
+After installing the rules:
 
-1. Feche o configurador.
-2. Desconecte a controladora.
-3. Conecte novamente.
-4. Se ainda houver erro de permissao, reinicie a sessao ou o computador.
+1. Close the configurator.
+2. Unplug the flight controller.
+3. Plug it back in.
+4. If permission errors continue, restart the session or reboot the computer.
 
-## Variaveis
+## Variables
 
-`RELEASE_LIMIT` controla quantos releases recentes sao consultados em cada repositorio:
+`RELEASE_LIMIT` controls how many recent releases are queried from each repository:
 
 ```bash
 RELEASE_LIMIT=20 ./bin/rotorflight-tools-installer.sh
 ```
 
-O valor padrao e `10`.
+The default value is `10`.
 
-## Avisos
+## Warnings
 
-- O script pode pedir `sudo` para escrever em `/opt`, `/usr/share/applications`, `/usr/share/icons` e `/etc/udev/rules.d`.
-- Nao execute aplicativos Electron/Chromium como root para contornar problema de USB. Corrija as regras `udev`.
-- Revise o script antes de executar, especialmente se estiver usando em uma distribuicao diferente de Manjaro.
+- The script may ask for `sudo` to write under `/opt`, `/usr/share/applications`, `/usr/share/icons`, and `/etc/udev/rules.d`.
+- Do not run Electron/Chromium applications as root to work around USB permission issues. Fix the `udev` rules instead.
+- Review the script before running it, especially on distributions other than Manjaro.
 
-## Licenca
+## License
 
-MIT. Veja [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

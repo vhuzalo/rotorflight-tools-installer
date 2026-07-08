@@ -55,9 +55,9 @@ declare -A COMMENT=(
 
 need_cmd() {
   command -v "$1" >/dev/null 2>&1 || {
-    echo "Dependencia ausente: $1"
-    echo "No Manjaro, instale com: sudo pacman -S --needed curl jq unzip tar"
-    echo "No Ubuntu/Debian, instale com: sudo apt install curl jq unzip tar"
+    echo "Missing dependency: $1"
+    echo "On Manjaro/Arch, install with: sudo pacman -S --needed curl jq unzip tar"
+    echo "On Ubuntu/Debian, install with: sudo apt install curl jq unzip tar"
     exit 1
   }
 }
@@ -66,24 +66,24 @@ show_help() {
   cat <<'HELP'
 Rotorflight Tools Installer
 
-Instala ou atualiza no Linux:
+Installs or updates on Linux:
   - Rotorflight Configurator
   - Rotorflight Blackbox
   - ExpressLRS Configurator
-  - regras udev para acesso USB/DFU a controladoras de voo
+  - udev rules for USB/DFU access to flight controllers
 
-Uso:
+Usage:
   ./bin/rotorflight-tools-installer.sh
   RELEASE_LIMIT=20 ./bin/rotorflight-tools-installer.sh
 
-Opcoes:
-  -h, --help    Mostra esta ajuda
+Options:
+  -h, --help    Show this help
 
-Notas:
-  - Os aplicativos sao instalados em /opt.
-  - Atalhos .desktop sao criados para o usuario atual e, quando possivel, globalmente.
-  - Algumas etapas podem pedir sudo.
-  - A opcao "Todos" usa automaticamente a ultima versao estavel de cada app.
+Notes:
+  - Applications are installed under /opt.
+  - .desktop launchers are created for the current user and globally when possible.
+  - Some steps may ask for sudo.
+  - The "All" option automatically uses the latest stable version of each app.
 HELP
 }
 
@@ -96,8 +96,8 @@ parse_args() {
     "")
       ;;
     *)
-      echo "Opcao desconhecida: $1" >&2
-      echo "Use --help para ver as opcoes." >&2
+      echo "Unknown option: $1" >&2
+      echo "Use --help to see available options." >&2
       exit 2
       ;;
   esac
@@ -128,15 +128,15 @@ select_app() {
   local choice
 
   echo
-  echo "O que voce quer instalar/atualizar?"
+  echo "What do you want to install/update?"
   echo "  1) Rotorflight Configurator"
   echo "  2) Rotorflight Blackbox"
   echo "  3) ExpressLRS Configurator"
-  echo "  4) Rotorflight Configurator + Blackbox + regras udev (padrao)"
-  echo "  5) Instalar regras udev do Rotorflight"
-  echo "  6) Todos - ultima versao estavel, sem perguntar release"
-  echo "  q) Sair"
-  read -rp "Escolha [4 - Rotorflight Configurator + Blackbox + regras udev]: " choice
+  echo "  4) Rotorflight Configurator + Blackbox + udev rules (default)"
+  echo "  5) Install Rotorflight udev rules"
+  echo "  6) All - latest stable version, no release prompt"
+  echo "  q) Quit"
+  read -rp "Choose [4 - Rotorflight Configurator + Blackbox + udev rules]: " choice
   choice="${choice:-4}"
 
   case "$choice" in
@@ -147,7 +147,7 @@ select_app() {
     5) SELECTED_APPS="udev" ;;
     6) SELECTED_APPS="configurator blackbox expresslrs"; AUTO_STABLE_RELEASES=1 ;;
     q|Q) exit 0 ;;
-    *) echo "Opcao invalida." >&2; return 1 ;;
+    *) echo "Invalid option." >&2; return 1 ;;
   esac
 }
 
@@ -170,7 +170,7 @@ SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6015", MODE="0666"
 RULES
 
   echo
-  echo "Instalando regras udev em ${UDEV_RULES_PATH}..."
+  echo "Installing udev rules to ${UDEV_RULES_PATH}..."
   run_privileged mkdir -p "$(dirname "$UDEV_RULES_PATH")"
   run_privileged cp "$tmp_rules" "$UDEV_RULES_PATH"
   run_privileged chmod 644 "$UDEV_RULES_PATH"
@@ -179,12 +179,12 @@ RULES
   if command -v udevadm >/dev/null 2>&1; then
     run_privileged udevadm control --reload-rules
     run_privileged udevadm trigger
-    echo "Regras udev recarregadas."
+    echo "udev rules reloaded."
   else
-    echo "Aviso: udevadm nao encontrado; reinicie o computador para carregar as regras."
+    echo "Warning: udevadm not found; reboot the computer to load the rules."
   fi
 
-  echo "Desconecte e conecte a controladora novamente antes de atualizar o firmware."
+  echo "Unplug and reconnect the flight controller before flashing firmware."
 }
 
 asset_jq_filter() {
@@ -193,7 +193,7 @@ asset_jq_filter() {
     configurator) echo 'linux_x86_64\.tar\.xz$' ;;
     blackbox) echo 'linux64\.zip$' ;;
     expresslrs) echo 'expresslrs-configurator-[0-9][^/]*\.zip$' ;;
-    *) echo "App desconhecido: $app" >&2; exit 1 ;;
+    *) echo "Unknown app: $app" >&2; exit 1 ;;
   esac
 }
 
@@ -203,7 +203,7 @@ release_rows() {
   local releases_json filter
 
   echo >&2
-  echo "Consultando releases de ${APP_NAME[$app]}..." >&2
+  echo "Fetching ${APP_NAME[$app]} releases..." >&2
   releases_json="$(api_get "$repo")"
   filter="$(asset_jq_filter "$app")"
 
@@ -232,18 +232,18 @@ select_latest_stable_release() {
   rows="$(release_rows "$app")"
 
   if [[ -z "$rows" ]]; then
-    echo "Nenhum asset Linux compativel encontrado para ${APP_NAME[$app]}." >&2
+    echo "No compatible Linux asset found for ${APP_NAME[$app]}." >&2
     return 1
   fi
 
   stable_row="$(awk -F '\t' '$5 == "stable" { print; exit }' <<<"$rows")"
   if [[ -z "$stable_row" ]]; then
-    echo "Nenhum release estavel com asset Linux compativel encontrado para ${APP_NAME[$app]}." >&2
+    echo "No stable release with a compatible Linux asset found for ${APP_NAME[$app]}." >&2
     return 1
   fi
 
   SELECTED_RELEASE="$stable_row"
-  echo "Selecionado automaticamente: $(cut -f2 <<<"$SELECTED_RELEASE") ($(cut -f6 <<<"$SELECTED_RELEASE"))"
+  echo "Automatically selected: $(cut -f2 <<<"$SELECTED_RELEASE") ($(cut -f6 <<<"$SELECTED_RELEASE"))"
 }
 
 select_release() {
@@ -253,28 +253,28 @@ select_release() {
   rows="$(release_rows "$app")"
 
   if [[ -z "$rows" ]]; then
-    echo "Nenhum asset Linux compativel encontrado para ${APP_NAME[$app]}." >&2
+    echo "No compatible Linux asset found for ${APP_NAME[$app]}." >&2
     return 1
   fi
 
   count="$(wc -l <<<"$rows" | tr -d ' ')"
   echo
-  echo "Releases disponiveis:"
+  echo "Available releases:"
   awk -F '\t' '{printf "  %2d) %-24s %-12s %s\n      %s\n", NR, $2, $5, substr($4, 1, 10), $6}' <<<"$rows"
-  echo "   q) Cancelar"
+  echo "   q) Cancel"
 
   while true; do
-    read -rp "Escolha o release para ${APP_NAME[$app]} [1]: " choice
+    read -rp "Choose the release for ${APP_NAME[$app]} [1]: " choice
     choice="${choice:-1}"
     case "$choice" in
       q|Q) return 1 ;;
-      ''|*[!0-9]*) echo "Digite um numero entre 1 e $count, ou q para cancelar." ;;
+      ''|*[!0-9]*) echo "Enter a number between 1 and $count, or q to cancel." ;;
       *)
         if (( choice >= 1 && choice <= count )); then
           SELECTED_RELEASE="$(sed -n "${choice}p" <<<"$rows")"
           return 0
         fi
-        echo "Digite um numero entre 1 e $count, ou q para cancelar."
+        echo "Enter a number between 1 and $count, or q to cancel."
         ;;
     esac
   done
@@ -394,7 +394,7 @@ extract_archive() {
     *.tar.xz) tar -xJf "$archive" -C "$target" ;;
     *.zip) unzip -q "$archive" -d "$target" ;;
     *)
-      echo "Formato de arquivo nao suportado: $archive" >&2
+      echo "Unsupported archive format: $archive" >&2
       return 1
       ;;
   esac
@@ -490,7 +490,7 @@ install_desktop_files() {
     sudo cp "$temp_desktop" "${APPLICATIONS_DIR}/${desktop_name}" || true
     sudo chmod 644 "${APPLICATIONS_DIR}/${desktop_name}" || true
   else
-    echo "Aviso: nao consegui atualizar ${APPLICATIONS_DIR}/${desktop_name}; rode com sudo se quiser atalho global."
+    echo "Warning: could not update ${APPLICATIONS_DIR}/${desktop_name}; run with sudo if you want a global launcher."
   fi
 
   rm -f "$temp_desktop"
@@ -527,24 +527,24 @@ install_app() {
   backup_dir="${install_dir}.bak-${stamp}"
 
   echo
-  echo "Baixando ${asset_name}..."
+  echo "Downloading ${asset_name}..."
   download_with_candy "$url" "$archive"
 
-  echo "Extraindo..."
+  echo "Extracting..."
   extract_archive "$archive" "$extract_dir"
 
   payload_dir="$(find_payload_dir "$extract_dir" "${EXEC_NAME[$app]}")" || {
-    echo "Nao encontrei o executavel ${EXEC_NAME[$app]} dentro do pacote." >&2
+    echo "Could not find executable ${EXEC_NAME[$app]} inside the package." >&2
     rm -rf "$tmp"
     return 1
   }
 
   chmod +x "${payload_dir}/${EXEC_NAME[$app]}" || true
 
-  echo "Instalando em ${install_dir}..."
+  echo "Installing to ${install_dir}..."
   if [[ -e "$install_dir" ]]; then
     run_privileged mv "$install_dir" "$backup_dir"
-    echo "Backup criado em ${backup_dir}"
+    echo "Backup created at ${backup_dir}"
   fi
 
   run_privileged mkdir -p "$BASE_DIR"
@@ -555,7 +555,7 @@ install_app() {
   install_desktop_files "$app"
   rm -rf "$tmp"
 
-  echo "${APP_NAME[$app]} instalado/atualizado para ${tag}."
+  echo "${APP_NAME[$app]} installed/updated to ${tag}."
 }
 
 main() {
@@ -569,7 +569,7 @@ main() {
   need_cmd awk
 
   echo "Rotorflight Tools Installer"
-  echo "Instalacao base: ${BASE_DIR}"
+  echo "Base installation directory: ${BASE_DIR}"
 
   local app
   until select_app; do
@@ -592,7 +592,7 @@ main() {
   done
 
   echo
-  echo "Concluido."
+  echo "Done."
 }
 
 main "$@"
