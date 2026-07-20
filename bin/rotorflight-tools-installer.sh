@@ -3,13 +3,15 @@ set -Eeuo pipefail
 
 # Rotorflight Tools Installer
 # Installs or updates Rotorflight Configurator, Rotorflight Blackbox,
-# ExpressLRS Configurator, and Linux udev rules for flight controllers.
+# ExpressLRS Configurator, HELI-X 11, and Linux udev rules for flight controllers.
 
 BASE_DIR="/opt"
 APPLICATIONS_DIR="/usr/share/applications"
 USER_APPLICATIONS_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
 RELEASE_LIMIT="${RELEASE_LIMIT:-10}"
 UDEV_RULES_PATH="/etc/udev/rules.d/60-rotorflight.rules"
+HELIX_ARCHIVE="${HELIX_ARCHIVE:-}"
+HELIX_URL="${HELIX_URL:-https://www.heli-x.info/2675/HELI-X11.tar.gz}"
 
 declare -A REPO=(
   [configurator]="rotorflight/rotorflight-configurator"
@@ -21,36 +23,42 @@ declare -A APP_DIR=(
   [configurator]="rotorflight-configurator"
   [blackbox]="rotorflight-blackbox"
   [expresslrs]="expresslrs-configurator"
+  [helix]="HELI-X11"
 )
 
 declare -A APP_NAME=(
   [configurator]="Rotorflight Configurator"
   [blackbox]="Rotorflight Blackbox"
   [expresslrs]="ExpressLRS Configurator"
+  [helix]="HELI-X 11"
 )
 
 declare -A EXEC_NAME=(
   [configurator]="rotorflight-configurator"
   [blackbox]="rotorflight-blackbox"
   [expresslrs]="expresslrs-configurator"
+  [helix]="runHELI-X.sh"
 )
 
 declare -A ICON_PATH=(
   [configurator]="icon/rf_icon.png"
   [blackbox]="icon/rf_icon_128.png"
   [expresslrs]="expresslrs-configurator"
+  [helix]="resources/miscellaneous/images/helix-background.png"
 )
 
 declare -A DESKTOP_ID=(
   [configurator]="rotorflight.desktop"
   [blackbox]="rotorflight-blackbox.desktop"
   [expresslrs]="expresslrs-configurator.desktop"
+  [helix]="heli-x11.desktop"
 )
 
 declare -A COMMENT=(
   [configurator]="Cross-platform configuration tool for the Rotorflight flight control system"
   [blackbox]="Cross-platform blackbox analytics tool for Rotorflight flight control system"
   [expresslrs]="Cross-platform configuration tool for ExpressLRS devices"
+  [helix]="RC helicopter flight simulator"
 )
 
 need_cmd() {
@@ -70,11 +78,13 @@ Installs or updates on Linux:
   - Rotorflight Configurator
   - Rotorflight Blackbox
   - ExpressLRS Configurator
+  - HELI-X 11
   - udev rules for USB/DFU access to flight controllers
 
 Usage:
   ./bin/rotorflight-tools-installer.sh
   RELEASE_LIMIT=20 ./bin/rotorflight-tools-installer.sh
+  HELIX_ARCHIVE=/path/to/HELI-X11.tar.gz ./bin/rotorflight-tools-installer.sh
 
 Options:
   -h, --help    Show this help
@@ -84,6 +94,7 @@ Notes:
   - .desktop launchers are created for the current user and globally when possible.
   - Some steps may ask for sudo.
   - The "All" option automatically uses the latest stable version of each app.
+  - HELI-X is downloaded from heli-x.info unless HELIX_ARCHIVE is set.
 HELP
 }
 
@@ -134,7 +145,8 @@ select_app() {
   echo "  3) ExpressLRS Configurator"
   echo "  4) Rotorflight Configurator + Blackbox + udev rules (default)"
   echo "  5) Install Rotorflight udev rules"
-  echo "  6) All - latest stable version, no release prompt"
+  echo "  6) HELI-X 11"
+  echo "  7) All - latest stable version, no release prompt"
   echo "  q) Quit"
   read -rp "Choose [4 - Rotorflight Configurator + Blackbox + udev rules]: " choice
   choice="${choice:-4}"
@@ -145,7 +157,8 @@ select_app() {
     3) SELECTED_APPS="expresslrs" ;;
     4) SELECTED_APPS="configurator blackbox" ;;
     5) SELECTED_APPS="udev" ;;
-    6) SELECTED_APPS="configurator blackbox expresslrs"; AUTO_STABLE_RELEASES=1 ;;
+    6) SELECTED_APPS="helix" ;;
+    7) SELECTED_APPS="configurator blackbox expresslrs helix"; AUTO_STABLE_RELEASES=1 ;;
     q|Q) exit 0 ;;
     *) echo "Invalid option." >&2; return 1 ;;
   esac
@@ -392,6 +405,7 @@ extract_archive() {
   mkdir -p "$target"
   case "$archive" in
     *.tar.xz) tar -xJf "$archive" -C "$target" ;;
+    *.tar.gz|*.tgz) tar -xzf "$archive" -C "$target" ;;
     *.zip) unzip -q "$archive" -d "$target" ;;
     *)
       echo "Unsupported archive format: $archive" >&2
@@ -482,11 +496,75 @@ write_desktop_file() {
     echo "Icon=${icon_path}"
     echo "Terminal=false"
     echo "Type=Application"
-    echo "Categories=Utility;"
+    if [[ "$app" == "helix" ]]; then
+      echo "Path=${install_dir}"
+      echo "Categories=Game;Simulation;"
+      echo "Keywords=helicopter;simulator;RC;HELI-X;"
+    else
+      echo "Categories=Utility;"
+    fi
     if [[ "$app" == "blackbox" ]]; then
       echo "MimeType=application/x-blackboxlog;"
     fi
   } >"$dest"
+}
+
+install_helix() {
+  local archive tmp extract_dir payload_dir install_dir backup_dir stamp owner group
+
+  tmp="$(mktemp -d)"
+  if [[ -n "$HELIX_ARCHIVE" ]]; then
+    [[ -f "$HELIX_ARCHIVE" ]] || {
+      echo "HELI-X package not found: ${HELIX_ARCHIVE}" >&2
+      rm -rf "$tmp"
+      return 1
+    }
+    archive="$HELIX_ARCHIVE"
+    echo
+    echo "Using local HELI-X package: ${archive}"
+  else
+    archive="${tmp}/HELI-X11.tar.gz"
+    echo
+    echo "Downloading HELI-X 11..."
+    download_with_candy "$HELIX_URL" "$archive"
+  fi
+
+  extract_dir="${tmp}/extract"
+  install_dir="${BASE_DIR}/${APP_DIR[helix]}"
+  stamp="$(date +%Y%m%d-%H%M%S)"
+  backup_dir="${install_dir}.bak-${stamp}"
+  owner="${SUDO_USER:-$(id -un)}"
+  group="$(id -gn "$owner")"
+
+  echo "Extracting $(basename "$archive")..."
+  extract_archive "$archive" "$extract_dir"
+  payload_dir="$(find_payload_dir "$extract_dir" "${EXEC_NAME[helix]}")" || {
+    echo "Could not find ${EXEC_NAME[helix]} inside the HELI-X package." >&2
+    rm -rf "$tmp"
+    return 1
+  }
+
+  chmod +x "${payload_dir}/runHELI-X.sh"
+  [[ ! -f "${payload_dir}/runHELI-X-Server.sh" ]] || chmod +x "${payload_dir}/runHELI-X-Server.sh"
+  if [[ -d "${payload_dir}/Java/jre21/bin" ]]; then
+    find "${payload_dir}/Java/jre21/bin" -maxdepth 1 -type f -exec chmod +x '{}' +
+  fi
+  [[ ! -f "${payload_dir}/Java/jre21/lib/jspawnhelper" ]] || chmod +x "${payload_dir}/Java/jre21/lib/jspawnhelper"
+
+  echo "Installing to ${install_dir}..."
+  if [[ -e "$install_dir" ]]; then
+    run_privileged mv "$install_dir" "$backup_dir"
+    echo "Backup created at ${backup_dir}"
+  fi
+
+  run_privileged mkdir -p "$BASE_DIR"
+  run_privileged mv "$payload_dir" "$install_dir"
+  run_privileged chown -R "${owner}:${group}" "$install_dir"
+  run_privileged chmod +x "${install_dir}/runHELI-X.sh"
+  install_desktop_files helix
+  rm -rf "$tmp"
+
+  echo "HELI-X 11 installed/updated from $(basename "$archive")."
 }
 
 install_desktop_files() {
@@ -607,6 +685,9 @@ main() {
         ;;
       udev)
         install_udev_rules
+        ;;
+      helix)
+        install_helix
         ;;
       *)
         install_app "$app"

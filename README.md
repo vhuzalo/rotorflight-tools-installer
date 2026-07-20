@@ -2,13 +2,14 @@
 
 Interactive Linux installer/updater for common Rotorflight tools.
 
-The script downloads official GitHub releases, installs applications under `/opt`, creates `.desktop` launchers, and installs `udev` rules for USB/DFU access to flight controllers.
+The script downloads official releases, installs applications under `/opt`, creates `.desktop` launchers, and installs `udev` rules for USB/DFU access to flight controllers.
 
 ## Installed Tools
 
 - Rotorflight Configurator
 - Rotorflight Blackbox
 - ExpressLRS Configurator
+- HELI-X 11
 - `udev` rules for firmware flashing and common USB serial ports
 
 ## Supported Systems
@@ -54,12 +55,13 @@ sudo apt install curl jq unzip tar
 3) ExpressLRS Configurator
 4) Rotorflight Configurator + Blackbox + udev rules (default)
 5) Install Rotorflight udev rules
-6) All - latest stable version, no release prompt
+6) HELI-X 11
+7) All - latest stable version, no release prompt
 ```
 
 Options `1`, `2`, `3`, and `4` let you choose a release from the list returned by GitHub.
 
-Option `6` does not ask which release to install. It automatically selects the latest `stable` version and ignores pre-releases/dev builds.
+Option `6` downloads and installs HELI-X from its official website. Option `7` installs every tool using the latest stable releases.
 
 ## What The Script Does
 
@@ -70,6 +72,7 @@ Option `6` does not ask which release to install. It automatically selects the l
 - creates a backup of the previous installation before replacing it;
 - creates `.desktop` launchers;
 - installs `udev` rules to `/etc/udev/rules.d/60-rotorflight.rules`;
+- downloads HELI-X from `https://www.heli-x.info/2675/HELI-X11.tar.gz` and keeps its directory writable for in-app updates;
 - reloads rules with `udevadm` when available.
 
 ## Udev Rules
@@ -92,6 +95,12 @@ RELEASE_LIMIT=20 ./bin/rotorflight-tools-installer.sh
 ```
 
 The default value is `10`.
+
+`HELIX_ARCHIVE` uses a local HELI-X package instead of downloading it:
+
+```bash
+HELIX_ARCHIVE=/path/to/HELI-X11.tar.gz ./bin/rotorflight-tools-installer.sh
+```
 
 ## Warnings
 
