@@ -435,6 +435,28 @@ install_extracted_shared_assets() {
   fi
 }
 
+configure_electron_sandbox() {
+  local app="$1"
+  local install_dir="${BASE_DIR}/${APP_DIR[$app]}"
+  local sandbox_path="${install_dir}/chrome-sandbox"
+
+  [[ "$app" == "expresslrs" ]] || return 0
+
+  if [[ ! -f "$sandbox_path" ]]; then
+    echo "Warning: Electron sandbox not found at ${sandbox_path}." >&2
+    return 0
+  fi
+
+  echo "Configuring the Electron sandbox..."
+  run_privileged chown root:root "$sandbox_path"
+  run_privileged chmod 4755 "$sandbox_path"
+
+  if [[ "$(stat -c '%U:%G %a' "$sandbox_path")" != "root:root 4755" ]]; then
+    echo "Could not configure the Electron sandbox at ${sandbox_path}." >&2
+    return 1
+  fi
+}
+
 write_desktop_file() {
   local app="$1"
   local dest="$2"
@@ -550,6 +572,7 @@ install_app() {
   run_privileged mkdir -p "$BASE_DIR"
   run_privileged mv "$payload_dir" "$install_dir"
   run_privileged chmod +x "${install_dir}/${EXEC_NAME[$app]}"
+  configure_electron_sandbox "$app"
 
   install_extracted_shared_assets "$extract_dir"
   install_desktop_files "$app"
