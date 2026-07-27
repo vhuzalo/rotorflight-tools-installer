@@ -9,6 +9,8 @@ The script downloads official releases, installs applications under `/opt`, crea
 - Rotorflight Configurator
 - Rotorflight Blackbox
 - ExpressLRS Configurator
+- [Blackbox Lab](https://github.com/hillbilly1975/Blackbox_Lab)
+- Rotorflight Radio Updater for installing Lua scripts on EdgeTX/OpenTX radios
 - HELI-X 11
 - `udev` rules for firmware flashing and common USB serial ports
 
@@ -56,12 +58,14 @@ sudo apt install curl jq unzip tar
 4) Rotorflight Configurator + Blackbox + udev rules (default)
 5) Install Rotorflight udev rules
 6) HELI-X 11
-7) All - latest stable version, no release prompt
+7) Rotorflight Radio Updater (EdgeTX/OpenTX)
+8) Blackbox Lab
+9) All - latest stable version, no release prompt
 ```
 
-Options `1`, `2`, `3`, and `4` let you choose a release from the list returned by GitHub.
+Options `1`, `2`, `3`, `4`, `7`, and `8` let you choose a release from the list returned by GitHub.
 
-Option `6` downloads and installs HELI-X from its official website. Option `7` installs every tool using the latest stable releases.
+Option `6` downloads and installs HELI-X from its official website. Option `9` installs every tool using the latest stable releases.
 
 ## What The Script Does
 
@@ -69,10 +73,13 @@ Option `6` downloads and installs HELI-X from its official website. Option `7` i
 - downloads the compatible Linux package;
 - extracts the archive;
 - installs the application under `/opt`;
+- selects the updater package matching Linux x86-64 or ARM64 automatically;
+- installs the Blackbox Lab Linux x86-64 portable package;
 - creates a backup of the previous installation before replacing it;
 - creates `.desktop` launchers;
 - installs `udev` rules to `/etc/udev/rules.d/60-rotorflight.rules`;
 - downloads HELI-X from `https://www.heli-x.info/2675/HELI-X11.tar.gz` and keeps its directory writable for in-app updates;
+- installs the official Rotorflight radio updater, which syncs `SCRIPTS` and `WIDGETS` to a mounted EdgeTX/OpenTX SD card;
 - reloads rules with `udevadm` when available.
 
 ## Udev Rules

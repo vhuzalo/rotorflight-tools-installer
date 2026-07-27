@@ -3,11 +3,18 @@ set -Eeuo pipefail
 
 # Rotorflight Tools Installer
 # Installs or updates Rotorflight Configurator, Rotorflight Blackbox,
-# ExpressLRS Configurator, HELI-X 11, and Linux udev rules for flight controllers.
+# ExpressLRS Configurator, Blackbox Lab, Rotorflight Radio Updater, HELI-X 11,
+# and Linux udev rules for flight controllers.
 
 BASE_DIR="/opt"
 APPLICATIONS_DIR="/usr/share/applications"
-USER_APPLICATIONS_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+INSTALL_USER="${SUDO_USER:-$(id -un)}"
+if [[ -n "${SUDO_USER:-}" ]]; then
+  INSTALL_USER_HOME="$(getent passwd "$INSTALL_USER" | cut -d: -f6)"
+  USER_APPLICATIONS_DIR="${INSTALL_USER_HOME}/.local/share/applications"
+else
+  USER_APPLICATIONS_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/applications"
+fi
 RELEASE_LIMIT="${RELEASE_LIMIT:-10}"
 UDEV_RULES_PATH="/etc/udev/rules.d/60-rotorflight.rules"
 HELIX_ARCHIVE="${HELIX_ARCHIVE:-}"
@@ -17,12 +24,16 @@ declare -A REPO=(
   [configurator]="rotorflight/rotorflight-configurator"
   [blackbox]="rotorflight/rotorflight-blackbox"
   [expresslrs]="ExpressLRS/ExpressLRS-Configurator"
+  [blackbox_lab]="hillbilly1975/Blackbox_Lab"
+  [radio_updater]="rotorflight/rotorflight-lua-edgetx-updater"
 )
 
 declare -A APP_DIR=(
   [configurator]="rotorflight-configurator"
   [blackbox]="rotorflight-blackbox"
   [expresslrs]="expresslrs-configurator"
+  [blackbox_lab]="blackbox-lab"
+  [radio_updater]="rotorflight-radio-updater"
   [helix]="HELI-X11"
 )
 
@@ -30,6 +41,8 @@ declare -A APP_NAME=(
   [configurator]="Rotorflight Configurator"
   [blackbox]="Rotorflight Blackbox"
   [expresslrs]="ExpressLRS Configurator"
+  [blackbox_lab]="Blackbox Lab"
+  [radio_updater]="Rotorflight Radio Updater"
   [helix]="HELI-X 11"
 )
 
@@ -37,6 +50,8 @@ declare -A EXEC_NAME=(
   [configurator]="rotorflight-configurator"
   [blackbox]="rotorflight-blackbox"
   [expresslrs]="expresslrs-configurator"
+  [blackbox_lab]="Blackbox Lab"
+  [radio_updater]="rotorflight-lua-edgetx-updater"
   [helix]="runHELI-X.sh"
 )
 
@@ -44,6 +59,8 @@ declare -A ICON_PATH=(
   [configurator]="icon/rf_icon.png"
   [blackbox]="icon/rf_icon_128.png"
   [expresslrs]="expresslrs-configurator"
+  [blackbox_lab]="utilities-system-monitor"
+  [radio_updater]="software-update-available"
   [helix]="resources/miscellaneous/images/helix-background.png"
 )
 
@@ -51,6 +68,8 @@ declare -A DESKTOP_ID=(
   [configurator]="rotorflight.desktop"
   [blackbox]="rotorflight-blackbox.desktop"
   [expresslrs]="expresslrs-configurator.desktop"
+  [blackbox_lab]="blackbox-lab.desktop"
+  [radio_updater]="rotorflight-radio-updater.desktop"
   [helix]="heli-x11.desktop"
 )
 
@@ -58,6 +77,8 @@ declare -A COMMENT=(
   [configurator]="Cross-platform configuration tool for the Rotorflight flight control system"
   [blackbox]="Cross-platform blackbox analytics tool for Rotorflight flight control system"
   [expresslrs]="Cross-platform configuration tool for ExpressLRS devices"
+  [blackbox_lab]="Rotorflight Blackbox log analysis and tuning suite"
+  [radio_updater]="Install and update Rotorflight Lua scripts on an EdgeTX/OpenTX radio"
   [helix]="RC helicopter flight simulator"
 )
 
@@ -78,6 +99,8 @@ Installs or updates on Linux:
   - Rotorflight Configurator
   - Rotorflight Blackbox
   - ExpressLRS Configurator
+  - Blackbox Lab
+  - Rotorflight Radio Updater for EdgeTX/OpenTX Lua scripts
   - HELI-X 11
   - udev rules for USB/DFU access to flight controllers
 
@@ -146,7 +169,9 @@ select_app() {
   echo "  4) Rotorflight Configurator + Blackbox + udev rules (default)"
   echo "  5) Install Rotorflight udev rules"
   echo "  6) HELI-X 11"
-  echo "  7) All - latest stable version, no release prompt"
+  echo "  7) Rotorflight Radio Updater (EdgeTX/OpenTX)"
+  echo "  8) Blackbox Lab"
+  echo "  9) All - latest stable version, no release prompt"
   echo "  q) Quit"
   read -rp "Choose [4 - Rotorflight Configurator + Blackbox + udev rules]: " choice
   choice="${choice:-4}"
@@ -158,7 +183,9 @@ select_app() {
     4) SELECTED_APPS="configurator blackbox" ;;
     5) SELECTED_APPS="udev" ;;
     6) SELECTED_APPS="helix" ;;
-    7) SELECTED_APPS="configurator blackbox expresslrs helix"; AUTO_STABLE_RELEASES=1 ;;
+    7) SELECTED_APPS="radio_updater" ;;
+    8) SELECTED_APPS="blackbox_lab" ;;
+    9) SELECTED_APPS="configurator blackbox expresslrs blackbox_lab radio_updater helix"; AUTO_STABLE_RELEASES=1 ;;
     q|Q) exit 0 ;;
     *) echo "Invalid option." >&2; return 1 ;;
   esac
@@ -202,10 +229,32 @@ RULES
 
 asset_jq_filter() {
   local app="$1"
+  local machine
   case "$app" in
     configurator) echo 'linux_x86_64\.tar\.xz$' ;;
     blackbox) echo 'linux64\.zip$' ;;
     expresslrs) echo 'expresslrs-configurator-[0-9][^/]*\.zip$' ;;
+    blackbox_lab)
+      machine="$(uname -m)"
+      case "$machine" in
+        x86_64|amd64) echo 'Blackbox\.Lab-linux-x64-[0-9][^/]*\.zip$' ;;
+        *)
+          echo "Unsupported architecture for ${APP_NAME[$app]}: ${machine}" >&2
+          return 1
+          ;;
+      esac
+      ;;
+    radio_updater)
+      machine="$(uname -m)"
+      case "$machine" in
+        x86_64|amd64) echo 'rotorflight-lua-edgetx-updater-[0-9][^/]*-linux-x64\.zip$' ;;
+        aarch64|arm64) echo 'rotorflight-lua-edgetx-updater-[0-9][^/]*-linux-arm64\.zip$' ;;
+        *)
+          echo "Unsupported architecture for ${APP_NAME[$app]}: ${machine}" >&2
+          return 1
+          ;;
+      esac
+      ;;
     *) echo "Unknown app: $app" >&2; exit 1 ;;
   esac
 }
@@ -454,7 +503,7 @@ configure_electron_sandbox() {
   local install_dir="${BASE_DIR}/${APP_DIR[$app]}"
   local sandbox_path="${install_dir}/chrome-sandbox"
 
-  [[ "$app" == "expresslrs" ]] || return 0
+  [[ "$app" == "expresslrs" || "$app" == "blackbox_lab" ]] || return 0
 
   if [[ ! -f "$sandbox_path" ]]; then
     echo "Warning: Electron sandbox not found at ${sandbox_path}." >&2
@@ -492,7 +541,11 @@ write_desktop_file() {
     echo "[Desktop Entry]"
     echo "Name=${APP_NAME[$app]}"
     echo "Comment=${COMMENT[$app]}"
-    echo "Exec=${exec_path}"
+    if [[ "$exec_path" == *" "* ]]; then
+      echo "Exec=\"${exec_path}\""
+    else
+      echo "Exec=${exec_path}"
+    fi
     echo "Icon=${icon_path}"
     echo "Terminal=false"
     echo "Type=Application"
@@ -579,9 +632,12 @@ install_desktop_files() {
   run_privileged cp "$temp_desktop" "${app_dir}/${EXEC_NAME[$app]}.desktop"
   run_privileged chmod 644 "${app_dir}/${EXEC_NAME[$app]}.desktop"
 
-  mkdir -p "$USER_APPLICATIONS_DIR"
-  cp "$temp_desktop" "${USER_APPLICATIONS_DIR}/${desktop_name}"
-  chmod 644 "${USER_APPLICATIONS_DIR}/${desktop_name}"
+  run_privileged mkdir -p "$USER_APPLICATIONS_DIR"
+  run_privileged cp "$temp_desktop" "${USER_APPLICATIONS_DIR}/${desktop_name}"
+  run_privileged chmod 644 "${USER_APPLICATIONS_DIR}/${desktop_name}"
+  if [[ -n "${SUDO_USER:-}" ]]; then
+    run_privileged chown "${INSTALL_USER}:$(id -gn "$INSTALL_USER")" "$USER_APPLICATIONS_DIR" "${USER_APPLICATIONS_DIR}/${desktop_name}"
+  fi
 
   if [[ -w "$APPLICATIONS_DIR" ]]; then
     cp "$temp_desktop" "${APPLICATIONS_DIR}/${desktop_name}"
@@ -649,6 +705,7 @@ install_app() {
 
   run_privileged mkdir -p "$BASE_DIR"
   run_privileged mv "$payload_dir" "$install_dir"
+  run_privileged chmod -R a+rX "$install_dir"
   run_privileged chmod +x "${install_dir}/${EXEC_NAME[$app]}"
   configure_electron_sandbox "$app"
 
@@ -668,6 +725,7 @@ main() {
   need_cmd unzip
   need_cmd find
   need_cmd awk
+  need_cmd getent
 
   echo "Rotorflight Tools Installer"
   echo "Base installation directory: ${BASE_DIR}"
