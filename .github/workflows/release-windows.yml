@@ -1,0 +1,52 @@
+name: Build Windows installer
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows-executable:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Publish single-file executable
+        shell: pwsh
+        run: >-
+          dotnet publish src/RotorflightToolsInstaller/RotorflightToolsInstaller.csproj
+          --configuration Release
+          --runtime win-x64
+          --self-contained true
+          --output artifacts/win-x64
+          -p:PublishSingleFile=true
+          -p:DebugType=None
+          -p:DebugSymbols=false
+
+      - name: Rename release asset
+        shell: pwsh
+        run: Move-Item artifacts/win-x64/RotorflightToolsInstaller.exe artifacts/RotorflightToolsInstaller-win-x64.exe
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RotorflightToolsInstaller-win-x64
+          path: artifacts/RotorflightToolsInstaller-win-x64.exe
+
+      - name: Create release and attach executable
+        if: github.ref_type == 'tag'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/RotorflightToolsInstaller-win-x64.exe
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}

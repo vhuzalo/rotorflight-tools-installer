@@ -18,7 +18,7 @@ apps, Windows shortcuts, and official `.exe` installers on Windows.
 
 ## Supported Systems
 
-The Bash version is tested on Manjaro Linux. The PowerShell version targets
+The Bash version is tested on Manjaro Linux. The Windows executable targets
 Windows 10 and 11 x64 and still needs validation on a real Windows installation.
 
 The script should work on other Linux distributions with `bash`, `curl`, `jq`, `tar`, `unzip`, `find`, `awk`, `sudo`, and `udev`, but that still needs validation.
@@ -42,7 +42,13 @@ Show help:
 
 ### Windows
 
-Open PowerShell in the repository directory and run:
+Download `RotorflightToolsInstaller-win-x64.exe` from the
+[latest release](https://github.com/vhuzalo/rotorflight-tools-installer/releases/latest)
+and double-click it. The executable is self-contained, so .NET does not need to
+be installed and the user does not need to run PowerShell manually.
+
+The original PowerShell version remains available as an alternative for
+development and troubleshooting:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\bin\rotorflight-tools-installer.ps1
@@ -54,11 +60,19 @@ Show help:
 powershell -ExecutionPolicy Bypass -File .\bin\rotorflight-tools-installer.ps1 -Help
 ```
 
-The Windows version downloads official x64 packages, installs portable apps under
+The Windows executable downloads official x64 packages, installs portable apps under
 `%LOCALAPPDATA%\Programs\Rotorflight Tools`, creates Desktop and Start Menu
 shortcuts, and starts the official installer when an application is distributed
 as an `.exe`. It does not need administrator privileges unless an application's
 official installer requests them.
+
+Maintainers can publish a Windows executable by pushing a version tag. Tags that
+contain `-` (for example, `v0.1.0-test.1`) are published as pre-releases:
+
+```bash
+git tag v0.1.0-test.1
+git push origin v0.1.0-test.1
+```
 
 ## Dependencies
 
@@ -78,8 +92,8 @@ sudo apt install curl jq unzip tar
 
 ### Windows
 
-- Windows PowerShell 5.1 or PowerShell 7
 - Windows 10 or 11 x64 (HELI-X also supports Windows ARM64)
+- Internet access
 
 No extra command-line dependencies are required.
 
@@ -123,7 +137,7 @@ On Linux, the Bash script:
 - installs the official Rotorflight radio updater, which syncs `SCRIPTS` and `WIDGETS` to a mounted EdgeTX/OpenTX SD card;
 - reloads rules with `udevadm` when available.
 
-On Windows, the PowerShell script:
+On Windows, the executable:
 
 - fetches releases through the GitHub API and selects Windows x64 assets;
 - installs Configurator, Blackbox Lab, and Radio Updater as portable apps;
@@ -163,7 +177,14 @@ The default value is `10`.
 HELIX_ARCHIVE=/path/to/HELI-X11.tar.gz ./bin/rotorflight-tools-installer.sh
 ```
 
-On Windows, the equivalent options are PowerShell parameters:
+The Windows executable accepts equivalent command-line options:
+
+```powershell
+.\RotorflightToolsInstaller-win-x64.exe --release-limit 20
+.\RotorflightToolsInstaller-win-x64.exe --install-root D:\Apps\Rotorflight
+```
+
+The legacy PowerShell script uses parameters instead:
 
 ```powershell
 .\bin\rotorflight-tools-installer.ps1 -ReleaseLimit 20

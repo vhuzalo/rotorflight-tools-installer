@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a self-contained Windows x64 executable and automatically create a GitHub
+  release with the executable when a version tag is pushed.
 - Add a Windows PowerShell installer with release selection, portable app backups,
   shortcuts, official installer support, and x64/ARM64 HELI-X detection.
 - Initial public project structure.
