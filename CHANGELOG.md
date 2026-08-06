@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a Windows PowerShell installer with release selection, portable app backups,
+  shortcuts, official installer support, and x64/ARM64 HELI-X detection.
 - Initial public project structure.
 - Add interactive installer for Rotorflight Configurator, Rotorflight Blackbox and ExpressLRS Configurator.
 - Add udev rule installation for flight controller USB/DFU access.

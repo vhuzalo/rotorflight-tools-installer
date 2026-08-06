@@ -1,8 +1,10 @@
 # Rotorflight Tools Installer
 
-Interactive Linux installer/updater for common Rotorflight tools.
+Interactive Linux and Windows installer/updater for common Rotorflight tools.
 
-The script downloads official releases, installs applications under `/opt`, creates `.desktop` launchers, and installs `udev` rules for USB/DFU access to flight controllers.
+The installers download official releases and provide native integration for each
+system: `/opt`, `.desktop` launchers, and `udev` rules on Linux; per-user portable
+apps, Windows shortcuts, and official `.exe` installers on Windows.
 
 ## Installed Tools
 
@@ -16,11 +18,14 @@ The script downloads official releases, installs applications under `/opt`, crea
 
 ## Supported Systems
 
-Tested on Manjaro Linux.
+The Bash version is tested on Manjaro Linux. The PowerShell version targets
+Windows 10 and 11 x64 and still needs validation on a real Windows installation.
 
 The script should work on other Linux distributions with `bash`, `curl`, `jq`, `tar`, `unzip`, `find`, `awk`, `sudo`, and `udev`, but that still needs validation.
 
 ## Installation
+
+### Linux
 
 Clone or download this repository and run:
 
@@ -35,7 +40,29 @@ Show help:
 ./bin/rotorflight-tools-installer.sh --help
 ```
 
+### Windows
+
+Open PowerShell in the repository directory and run:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\bin\rotorflight-tools-installer.ps1
+```
+
+Show help:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\bin\rotorflight-tools-installer.ps1 -Help
+```
+
+The Windows version downloads official x64 packages, installs portable apps under
+`%LOCALAPPDATA%\Programs\Rotorflight Tools`, creates Desktop and Start Menu
+shortcuts, and starts the official installer when an application is distributed
+as an `.exe`. It does not need administrator privileges unless an application's
+official installer requests them.
+
 ## Dependencies
+
+### Linux
 
 On Manjaro/Arch:
 
@@ -49,7 +76,16 @@ On Ubuntu/Debian:
 sudo apt install curl jq unzip tar
 ```
 
+### Windows
+
+- Windows PowerShell 5.1 or PowerShell 7
+- Windows 10 or 11 x64 (HELI-X also supports Windows ARM64)
+
+No extra command-line dependencies are required.
+
 ## Menu
+
+The Linux menu includes the following options:
 
 ```text
 1) Rotorflight Configurator
@@ -67,7 +103,12 @@ Options `1`, `2`, `3`, `4`, `7`, and `8` let you choose a release from the list 
 
 Option `6` downloads and installs HELI-X from its official website. Option `9` installs every tool using the latest stable releases.
 
+The Windows menu mirrors these choices. Since Windows does not use `udev`, its
+option `5` shows USB/DFU driver guidance instead of installing rules.
+
 ## What The Script Does
+
+On Linux, the Bash script:
 
 - fetches official releases from GitHub;
 - downloads the compatible Linux package;
@@ -82,9 +123,22 @@ Option `6` downloads and installs HELI-X from its official website. Option `9` i
 - installs the official Rotorflight radio updater, which syncs `SCRIPTS` and `WIDGETS` to a mounted EdgeTX/OpenTX SD card;
 - reloads rules with `udevadm` when available.
 
+On Windows, the PowerShell script:
+
+- fetches releases through the GitHub API and selects Windows x64 assets;
+- installs Configurator, Blackbox Lab, and Radio Updater as portable apps;
+- backs up an existing portable installation before replacing it;
+- creates Desktop and Start Menu shortcuts for portable apps;
+- runs the official Blackbox, ExpressLRS, and HELI-X installers;
+- selects the HELI-X x64 or ARM64 installer automatically;
+- supports choosing a release or installing all latest stable releases.
+
 ## Udev Rules
 
 The `udev` rules allow the user to access flight controllers in DFU/USB mode without running the configurator as root.
+
+This section applies only to Linux. Windows uses USB/DFU drivers rather than
+`udev` rules; the Windows menu includes driver guidance.
 
 After installing the rules:
 
@@ -107,6 +161,14 @@ The default value is `10`.
 
 ```bash
 HELIX_ARCHIVE=/path/to/HELI-X11.tar.gz ./bin/rotorflight-tools-installer.sh
+```
+
+On Windows, the equivalent options are PowerShell parameters:
+
+```powershell
+.\bin\rotorflight-tools-installer.ps1 -ReleaseLimit 20
+.\bin\rotorflight-tools-installer.ps1 -HelixInstaller C:\Downloads\setupHeli-X11_win64.exe
+.\bin\rotorflight-tools-installer.ps1 -InstallRoot D:\Apps\Rotorflight
 ```
 
 ## Warnings
