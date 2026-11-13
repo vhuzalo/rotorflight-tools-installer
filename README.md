@@ -111,6 +111,7 @@ The Linux menu includes the following options:
 7) Rotorflight Radio Updater (EdgeTX/OpenTX)
 8) Blackbox Lab
 9) All - latest stable version, no release prompt
+10) Update all - install only newer stable releases
 ```
 
 Options `1`, `2`, `3`, `4`, `7`, and `8` let you choose a release from the list returned by GitHub.
@@ -119,6 +120,33 @@ Option `6` downloads and installs HELI-X from its official website. Option `9` i
 
 The Windows menu mirrors these choices. Since Windows does not use `udev`, its
 option `5` shows USB/DFU driver guidance instead of installing rules.
+
+### Updating only when a newer release exists
+
+Choose **10) Update all** on Linux or Windows. This checks the latest compatible
+stable GitHub release for each application before downloading any package. The
+installer records the release tag and publication date after a successful
+installation. The same tag or a release published earlier than or at the recorded
+date is skipped; a different tag with a later publication date is installed.
+This compares GitHub release publication dates, rather than interpreting version
+numbers. Option 9 still installs all packages regardless of their recorded version.
+
+- Missing Linux apps and Windows portable apps are installed automatically.
+- Existing apps without a valid release record are skipped with a message. This
+  includes installations made by older versions of this project. Install them once
+  using options 1–9 to establish the record used by subsequent update checks.
+- Windows apps distributed as `.exe` installers use the last successful installer
+  run recorded by this tool. Without that record, they are skipped, because their
+  installation paths and versions are managed by the official installers.
+- HELI-X is skipped with a message: use its in-app updater, or option 6 to reinstall.
+  Its fixed download URL does not provide a release version in the current flow.
+- Linux `udev` rules are left alone by option 10; use option 5 to reinstall them.
+
+Release records are stored as `.rotorflight-release.json` inside each portable
+application directory (including Linux apps), or under `.releases` in the Windows
+installation root for `.exe` installers. Both Windows entry points share the same
+record format. Changes made by other installers or in-app updates are not detected
+by these records.
 
 ## What The Script Does
 

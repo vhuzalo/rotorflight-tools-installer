@@ -40,6 +40,7 @@ internal static class Program
       "rotorflight-lua-edgetx-updater.exe", true)
   };
 
+  private static bool UpdateOnly { get; set; }
   private static int ReleaseLimit { get; set; } = 10;
   private static string InstallRoot { get; set; } = Path.Combine(
     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Rotorflight Tools");
@@ -58,7 +59,11 @@ internal static class Program
       foreach (var appId in selected)
       {
         if (appId == "drivers") ShowDriverInfo();
-        else if (appId == "helix") await InstallHelixAsync();
+        else if (appId == "helix")
+        {
+          if (UpdateOnly) Console.WriteLine("HELI-X: use o atualizador do proprio aplicativo; consulta de versao indisponivel.");
+          else await InstallHelixAsync();
+        }
         else await InstallGitHubAppAsync(appId, latestStable);
       }
 
@@ -124,6 +129,7 @@ internal static class Program
           7) Rotorflight Radio Updater (EdgeTX/OpenTX)
           8) Blackbox Lab
           9) Todos - ultima versao estavel, sem perguntar a release
+          10) Atualizar todos - instalar somente releases estaveis mais recentes
           q) Sair
         """);
       Console.Write("Escolha [4]: ");
@@ -139,6 +145,9 @@ internal static class Program
         case "7": return (["radio_updater"], false);
         case "8": return (["blackbox_lab"], false);
         case "9": return (["configurator", "blackbox", "expresslrs", "blackbox_lab", "radio_updater", "helix"], true);
+        case "10":
+          UpdateOnly = true;
+          return (["configurator", "blackbox", "expresslrs", "blackbox_lab", "radio_updater", "helix"], true);
         case "q": return ([], false);
         default: Console.WriteLine("Opcao invalida."); break;
       }
@@ -151,9 +160,32 @@ internal static class Program
     var release = await SelectReleaseAsync(app, latestStable);
     if (release is null) return;
 
+    var receipt = Path.Combine(InstallRoot, app.Portable ? app.Directory! : ".releases", ".rotorflight-release" + (app.Portable ? "" : "-" + appId) + ".json");
+    if (UpdateOnly)
+    {
+      Release? installed = null;
+      try { if (File.Exists(receipt)) installed = JsonSerializer.Deserialize<Release>(await File.ReadAllTextAsync(receipt)); }
+      catch (JsonException) { }
+      var missingPortable = app.Portable && !File.Exists(Path.Combine(InstallRoot, app.Directory!, app.Executable!));
+      if (!missingPortable)
+      {
+        if (installed is null || string.IsNullOrWhiteSpace(installed.Tag) || installed.Published == default)
+        {
+          Console.WriteLine($"{app.Name}: versao desconhecida; ignorado. Instale uma vez pelas opcoes 1-9 para registra-la.");
+          return;
+        }
+        if (installed.Tag == release.Tag || installed.Published >= release.Published)
+        {
+          Console.WriteLine($"{app.Name}: {installed.Tag} atual ou mais recente; ignorado.");
+          return;
+        }
+      }
+    }
     if (app.Portable) await InstallPortableAsync(app, release);
     else await DownloadAndRunInstallerAsync(app.Name, release.Url, release.AssetName);
 
+    Directory.CreateDirectory(Path.GetDirectoryName(receipt)!);
+    await File.WriteAllTextAsync(receipt, JsonSerializer.Serialize(release));
     Console.WriteLine($"{app.Name} instalado/atualizado para {release.Tag}.");
   }
 

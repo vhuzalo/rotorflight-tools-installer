@@ -116,7 +116,8 @@ Notes:
   - Applications are installed under /opt.
   - .desktop launchers are created for the current user and globally when possible.
   - Some steps may ask for sudo.
-  - The "All" option automatically uses the latest stable version of each app.
+  - Option 9 installs all latest stable releases; option 10 installs only newer releases.
+  - Option 10 skips unknown installed versions and HELI-X (use its in-app updater).
   - HELI-X is downloaded from heli-x.info unless HELIX_ARCHIVE is set.
 HELP
 }
@@ -172,6 +173,7 @@ select_app() {
   echo "  7) Rotorflight Radio Updater (EdgeTX/OpenTX)"
   echo "  8) Blackbox Lab"
   echo "  9) All - latest stable version, no release prompt"
+  echo "  10) Update all - install only newer stable releases"
   echo "  q) Quit"
   read -rp "Choose [4 - Rotorflight Configurator + Blackbox + udev rules]: " choice
   choice="${choice:-4}"
@@ -186,6 +188,7 @@ select_app() {
     7) SELECTED_APPS="radio_updater" ;;
     8) SELECTED_APPS="blackbox_lab" ;;
     9) SELECTED_APPS="configurator blackbox expresslrs blackbox_lab radio_updater helix"; AUTO_STABLE_RELEASES=1 ;;
+    10) SELECTED_APPS="configurator blackbox expresslrs blackbox_lab radio_updater helix"; AUTO_STABLE_RELEASES=1; UPDATE_ONLY=1 ;;
     q|Q) exit 0 ;;
     *) echo "Invalid option." >&2; return 1 ;;
   esac
@@ -661,6 +664,32 @@ install_desktop_files() {
   fi
 }
 
+# Receipts are stored beside the application and never sourced as shell code.
+should_update_app() {
+  local app="$1" tag="$2" published="$3"
+  local install_dir="${BASE_DIR}/${APP_DIR[$1]}" receipt installed_tag installed_date installed_epoch candidate_epoch
+  receipt="${install_dir}/.rotorflight-release.json"
+  if [[ ! -f "${install_dir}/${EXEC_NAME[$app]}" ]]; then
+    echo "${APP_NAME[$app]}: not installed; installing ${tag}."
+    return 0
+  fi
+  if ! installed_tag="$(jq -er '.Tag | select(type == "string" and length > 0)' "$receipt" 2>/dev/null)" ||
+     ! installed_date="$(jq -er '.Published | select(type == "string" and length > 0)' "$receipt" 2>/dev/null)"; then
+    echo "${APP_NAME[$app]}: unknown installed version; skipped. Install once using options 1-9 to register it."
+    return 1
+  fi
+  if ! installed_epoch="$(date -d "$installed_date" +%s 2>/dev/null)" ||
+     ! candidate_epoch="$(date -d "$published" +%s 2>/dev/null)"; then
+    echo "${APP_NAME[$app]}: invalid release date; skipped."
+    return 1
+  fi
+  if [[ "$installed_tag" == "$tag" ]] || (( candidate_epoch <= installed_epoch )); then
+    echo "${APP_NAME[$app]}: ${installed_tag} is current or newer; skipped."
+    return 1
+  fi
+  echo "${APP_NAME[$app]}: update ${installed_tag} -> ${tag}."
+}
+
 install_app() {
   local app="$1"
   local tag asset_name url tmp archive extract_dir payload_dir install_dir backup_dir stamp
@@ -674,6 +703,12 @@ install_app() {
   tag="$(cut -f2 <<<"$SELECTED_RELEASE")"
   asset_name="$(cut -f6 <<<"$SELECTED_RELEASE")"
   url="$(cut -f7 <<<"$SELECTED_RELEASE")"
+
+  local published receipt
+  published="$(cut -f4 <<<"$SELECTED_RELEASE")"
+  if [[ "${UPDATE_ONLY:-0}" -eq 1 ]]; then
+    should_update_app "$app" "$tag" "$published" || return 0
+  fi
 
   tmp="$(mktemp -d)"
   archive="${tmp}/${asset_name}"
@@ -711,6 +746,10 @@ install_app() {
 
   install_extracted_shared_assets "$extract_dir"
   install_desktop_files "$app"
+  receipt="${tmp}/release.json"
+  jq -n --arg Tag "$tag" --arg Published "$published" '{Tag: $Tag, Published: $Published}' >"$receipt"
+  run_privileged cp "$receipt" "${install_dir}/.rotorflight-release.json"
+  run_privileged chmod 644 "${install_dir}/.rotorflight-release.json"
   rm -rf "$tmp"
 
   echo "${APP_NAME[$app]} installed/updated to ${tag}."
@@ -739,13 +778,17 @@ main() {
     case "$app" in
       configurator)
         install_app "$app"
-        install_udev_rules
+        if [[ "${UPDATE_ONLY:-0}" -ne 1 ]]; then install_udev_rules; fi
         ;;
       udev)
         install_udev_rules
         ;;
       helix)
-        install_helix
+        if [[ "${UPDATE_ONLY:-0}" -eq 1 ]]; then
+          echo "HELI-X: automatic version check unavailable; use the in-app updater."
+        else
+          install_helix
+        fi
         ;;
       *)
         install_app "$app"

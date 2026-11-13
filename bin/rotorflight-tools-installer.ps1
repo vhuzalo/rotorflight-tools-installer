@@ -231,6 +231,28 @@ function Install-GitHubApp([string]$AppId, [switch]$LatestStable) {
     $app = $Apps[$AppId]
     $release = Select-Release $AppId -LatestStable:$LatestStable
     if (-not $release) { return }
+    $portable = $app.Kind -eq 'Portable'
+    $receiptDirectory = if ($portable) { Join-Path $InstallRoot $app.Directory } else { Join-Path $InstallRoot '.releases' }
+    $receiptName = if ($portable) { '.rotorflight-release.json' } else { ".rotorflight-release-$AppId.json" }
+    $receipt = Join-Path $receiptDirectory $receiptName
+    if ($script:UpdateOnly) {
+        $installed = $null
+        if (Test-Path -LiteralPath $receipt) {
+            try { $installed = Get-Content -LiteralPath $receipt -Raw | ConvertFrom-Json } catch { $installed = $null }
+        }
+        $missingPortable = $portable -and -not (Test-Path -LiteralPath (Join-Path $receiptDirectory $app.Executable) -PathType Leaf)
+        if (-not $missingPortable) {
+            $installedDate = [datetime]::MinValue
+            if (-not $installed.Tag -or -not [datetime]::TryParse([string]$installed.Published, [ref]$installedDate)) {
+                Write-Host "$($app.Name): unknown installed version; skipped. Install once using options 1-9 to register it."
+                return
+            }
+            if ($installed.Tag -eq $release.Tag -or $installedDate -ge $release.Published) {
+                Write-Host "$($app.Name): $($installed.Tag) is current or newer; skipped."
+                return
+            }
+        }
+    }
     if ($app.Kind -eq 'Portable') {
         Install-PortableApp $AppId $release
     }
@@ -238,9 +260,16 @@ function Install-GitHubApp([string]$AppId, [switch]$LatestStable) {
         Install-Exe $app.Name $release.Url $release.AssetName
         Write-Host "$($app.Name) installed/updated to $($release.Tag)."
     }
+    New-Item -ItemType Directory -Path $receiptDirectory -Force | Out-Null
+    @{ Tag = $release.Tag; Published = $release.Published.ToUniversalTime().ToString('o') } |
+        ConvertTo-Json | Set-Content -LiteralPath $receipt -Encoding UTF8
 }
 
 function Install-Helix {
+    if ($script:UpdateOnly) {
+        Write-Host 'HELI-X: automatic version check unavailable; use the in-app updater.'
+        return
+    }
     if ($HelixInstaller) {
         if (-not (Test-Path -LiteralPath $HelixInstaller -PathType Leaf)) {
             throw "HELI-X installer not found: $HelixInstaller"
@@ -278,6 +307,7 @@ What do you want to install/update?
   7) Rotorflight Radio Updater (EdgeTX/OpenTX)
   8) Blackbox Lab
   9) All - latest stable version, no release prompt
+  10) Update all - install only newer stable releases
   q) Quit
 '@
     $choice = Read-Host 'Choose [4 - Rotorflight Configurator + Blackbox]'
@@ -292,6 +322,7 @@ What do you want to install/update?
         '^7$' { return ,@('radio_updater') }
         '^8$' { return ,@('blackbox_lab') }
         '^9$' { $script:AutoStable = $true; return ,@('configurator', 'blackbox', 'expresslrs', 'blackbox_lab', 'radio_updater', 'helix') }
+        '^10$' { $script:AutoStable = $true; $script:UpdateOnly = $true; return ,@('configurator', 'blackbox', 'expresslrs', 'blackbox_lab', 'radio_updater', 'helix') }
         '^[qQ]$' { return @() }
         default { Write-Warning 'Invalid option.'; return $null }
     }

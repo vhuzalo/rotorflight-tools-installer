@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Add menu option 10 to check stable GitHub releases and install only releases
+  published after the recorded installation, on Linux and both Windows installers.
+- Record successful installations; skip unknown versions and direct HELI-X users
+  to the in-app updater.
+
 - Add a self-contained Windows x64 executable and automatically create a GitHub
   release with the executable when a version tag is pushed.
 - Add a Windows PowerShell installer with release selection, portable app backups,
